@@ -123,7 +123,7 @@ def PAACRF_predict(peptides):
     with open('../data/PseAAC_feature_ranking_0723.csv','r') as file:
         ranking = np.array([int(x) for x in file.readline().split(',')])
         
-    i = 700
+    i = 500
     features = np.array([gen_PseAAC_data(peptide) for peptide in peptides])
     features = features[:,ranking < i]
     
@@ -143,7 +143,7 @@ def predict(peptides):
         Format: [[p1(0), p1(1)],[p2(0), p2(1)],[p3(0),p3(1)], ...]
 
     """
-    sgd = pickle.load(open('../data/Combined_Model_2.sav', 'rb'))
+    sgd = pickle.load(open('../data/Combined_Model.sav', 'rb'))
     
     features = np.concatenate((PAACRF_predict(peptides)[:,[1]], triseq_predict(peptides)), axis=1)
     predictions = sgd.predict_proba(features)

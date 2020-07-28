@@ -25,7 +25,7 @@ Deptendencies: pandas, numpy, itertools, pickle, kears, sklearn, math
 import pandas as pd
 import numpy as np
 import itertools
-from STAAC_predict import predict
+from STAAC_predict import triseq_predict, predict
 
 aminoAcids = ["A","R","N","C","D","E","Q","G","H","I","L","K","M","F","P","S","T","W","Y","V"]
 
@@ -88,18 +88,20 @@ def mating(parents, numOffsprings, n_splits):
     return offsprings
     
 def GA(mutationFrequency = 0.1, popsize=50, nGenerations=5, nParents=0.25, n_splitsCrossover=2):
+    
     pop = [random_peptide() for _ in range(popsize)]
     fitness = predict(pop)[:,1]
     pop = [Peptide(pop[x], fitness[x]) for x in range(popsize)]
     parents = []
     for generation in range(nGenerations):
-        print('#'*30)
-        print('Generation:', generation)
         selectionOrder = sorted(pop, key=lambda x: x.fitness, reverse=True)
         parents = selectionOrder[:int(nParents*popsize)]
+        print('#'*30)
+        print('Generation:', generation)
         print('Top 5 Parents:')
         for parent in parents[:5]:
             print(parent.sequence, 'P=', parent.fitness)
+        
             
         offsprings = mating(parents, popsize - len(parents), n_splitsCrossover)
         mutateindxs = np.random.choice([True, False], size=len(offsprings), p=[mutationFrequency, 1-mutationFrequency])
@@ -120,5 +122,5 @@ def GA(mutationFrequency = 0.1, popsize=50, nGenerations=5, nParents=0.25, n_spl
  
   
 if __name__ == '__main__':
-    GA_df = GA(nGenerations=2, mutationFrequency=0.4, popsize=8, n_splitsCrossover=2)
+    GA_df = GA(nGenerations=50, mutationFrequency=0.1, popsize=20, n_splitsCrossover=2)
     print(GA_df)
