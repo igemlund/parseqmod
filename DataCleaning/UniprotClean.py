@@ -1,17 +1,17 @@
-with open("UniprotNoAMPNoAFP.csv", "r") as f:
+with open("uniprotNoAFP.csv", "r") as f:
     raw = f.read()
 dat = raw.split("\n")
 vec=[0]*(len(dat)-1)
-for i in range(len(dat)-1):
+for i in range(len(dat)-2):
     k=dat[i+1].split(";")
     vec[i]=k[1]
 vec = list(set(vec))
-print(vec)
+del vec[0]
 
 #standard aminoacids
 standard = ["A", "R", "N", "D", "C", "Q", "E", "G", "H", "I", "L", "K", "M", "F", "P", "S", "T", "W", "Y", "V"]
 
-f=open('basesuniprotnoampafp.txt','w')
+f=open('basesuniprotNoAFP.txt','w')
 #writes all sequences consisting only of standard aminoacids to file.
 for i in vec:
     if isinstance(i,str):
