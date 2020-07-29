@@ -6,12 +6,20 @@ Created on Fri Jul 24 18:14:46 2020
 
 ##############################################################################
 Predicts if a given peptide has antifungal activity.
-5 fold cross validated accuracy: 0.9
-NOTE: The model can only identify AMPs without AF properties with a precision of \
-    .25. A better model is in the process of being tuned. 
-The model combines the results of a NN trained on the peptides sequential data \
-    and mono, bi and trigrams with a RandomForestC trained on the peptides PseAAC
-    (Type I, lamda = 2). The models' individual accuracies are: NN: 0.87, RFC: 0.88
+5 fold cross validated metrics:
+    Average precision: 0.84
+    Average precision by label: AFP - 0.72, noAMP - 0.76, noAFPAMP - 0.65
+Model build by combining three individual models using an SVM:
+    Neural Network(NN) trained on Mono-, Bi- and Trigram feature extraction from peptide sequence:
+        Average precision: 0.81
+        Average precision by label: AFP - 0.62, noAMP - 0.88, noAFPAMP - 0.64
+    NN trained on dummy matrix of peptide sequence:
+        Average precision: 0.82
+        Average precision by label: AFP - 0.66, noAMP - 0.86, noAFPAMP - 0.59
+    Random Forest Classifier trained on PseAAC data of peptide sequence:
+        Average precision: 0.86
+        Average precision by label: AFP - 0.58, noAMP - 0.72, noAFPAMP - 0.83
+
 ##############################################################################
 """
 from sklearn.metrics import confusion_matrix, accuracy_score
@@ -77,13 +85,17 @@ def gen_ngrams_data(peptide):
         features.append(features_dict[term])
     return features
 
-def triseq_predict(peptides):
+def NN_predict(peptides, modelName):
     """
-
+    Classifies peptides using a neural network
+    
     Parameters
     ----------
     peptides : list
         List of peptides to be assessed. Amino acids capitalized.
+    modelName : string
+        Model to use to predict. Choose from 'NgramsModel', and 'SeqModel'
+        
 
     Returns
     -------
@@ -92,21 +104,22 @@ def triseq_predict(peptides):
             peptide has antifungal properties.
 
     """
-    json_file = open("../data/TriSeqModel.json", 'r')
+    data_generator = {'NgramsModel':gen_ngrams_data, 'SeqModel':gen_sequential_data}[modelName]
+    json_file = open("../data/%s.json" %(modelName), 'r')
     loaded_model_json = json_file.read()
     json_file.close()
-    triseq = model_from_json(loaded_model_json)
-    triseq.load_weights("../data/TriSeqModel_weights.h5")
+    model = model_from_json(loaded_model_json)
+    model.load_weights("../data/%s_weights.h5" %(modelName))
     
-    features_ngram = [gen_ngrams_data(peptide) for peptide in peptides]
-    features_seq = [gen_sequential_data(peptide) for peptide in peptides]
+    features = np.array([data_generator(peptide) for peptide in peptides])
     
-    prediction = triseq.predict([features_ngram, features_seq])
+    prediction = model.predict(features)
     return prediction
 
 def PAACRF_predict(peptides):
     """
-
+    Classifies peptides using PseAAC and a RandomForestClassifier.
+    
     Parameters
     ----------
     peptides : list
@@ -119,7 +132,7 @@ def PAACRF_predict(peptides):
         Format: [[p1(0), p1(1)],[p2(0), p2(1)],[p3(0),p3(1)], ...]
 
     """
-    PAACPF = pickle.load(open('../data/PseAACModel.sav', 'rb'))
+    PAACPF = pickle.load(open('../data/PseAACModel_test.sav', 'rb'))
     with open('../data/PseAAC_feature_ranking_0723.csv','r') as file:
         ranking = np.array([int(x) for x in file.readline().split(',')])
         
@@ -131,6 +144,11 @@ def PAACRF_predict(peptides):
 
 def predict(peptides):
     """
+    Combines models using an SVM classifier with a rbf kernel. \
+        The SVM takes the predictions from the three classifiers in the order
+        PseAAC, Trigrams, Sequential and only uses the first 2 probabillities 
+        from each.
+        
     Parameters
     ----------
     peptides : list
@@ -143,9 +161,10 @@ def predict(peptides):
         Format: [[p1(0), p1(1)],[p2(0), p2(1)],[p3(0),p3(1)], ...]
 
     """
-    sgd = pickle.load(open('../data/Combined_Model.sav', 'rb'))
-    
-    features = np.concatenate((PAACRF_predict(peptides)[:,[1]], triseq_predict(peptides)), axis=1)
-    predictions = sgd.predict_proba(features)
+    svm = pickle.load(open('../data/Combined_Model_test.sav', 'rb'))
+    pseaac_pred = PAACRF_predict(peptides)[:,:2]
+    Trigram_pred = NN_predict(peptides, 'NgramsModel')[:,:2]
+    Seq_pred = NN_predict(peptides, 'SeqModel')[:,:2]
+    features = np.concatenate((pseaac_pred, Trigram_pred, Seq_pred), axis=1)
+    predictions = svm.predict_proba(features)
     return predictions
-
